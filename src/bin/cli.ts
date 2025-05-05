@@ -1,15 +1,20 @@
 #!/usr/bin/env node
 import { program } from "commander";
-import { share2json } from "../lib/share2json.js";
+import { chat2json } from "../lib/chat2json.js";
 import { list2md } from "../lib/list2md.js";
 import fs from "fs";
 
 program
-  .command("share2json <url> <out>")
-  .description("共享链接 → messages.json")
-  .action(async (url, out) => {
-    const list = await share2json(url);
-    fs.writeFileSync(out, JSON.stringify(list, null, 2));
+  .command("chat2json <convUrl> <outFile>")
+  .description("conversation 链接 → messages.json")
+  .option("-t, --token <token>", "OpenAI Bearer token")
+  .action(async (convUrl, outFile, opts) => {
+    const list = await chat2json(convUrl, opts.token);
+    await fs.writeFile(outFile, JSON.stringify(list, null, 2), err => {
+      if (err) throw err;
+      console.log(`✔ 已写入 ${outFile}`);
+    });
+    console.log(`✔ 已写入 ${outFile}`);
   });
 
 program

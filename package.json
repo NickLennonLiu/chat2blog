@@ -19,7 +19,9 @@
     "axios": "^1.7.0",
     "cheerio": "^1.0.0-rc.12",
     "commander": "^11.0.0",
-    "gray-matter": "^4.0.3"
+    "gray-matter": "^4.0.3",
+    "lz-string": "^1.5.0",
+    "puppeteer": "^24.8.0"
   },
   "peerDependencies": {
     "hexo": ">=6"

@@ -3,6 +3,24 @@ import axios, { AxiosError } from "axios";
 import { Message } from "./types.js";
 import { parseBackendConversation, flattenConversation } from "./chatgptParser.js"
 
+
+async function auth_session() {
+  const url = "https://chat.openai.com/api/auth/session";
+  try {
+    const { data } = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+      },
+    });
+    return data;
+  } catch (e) {
+    const err = e as AxiosError;
+    if (err.response?.status === 401)
+      throw new Error("401 Unauthorized：token 失效或权限不足");
+    throw err;
+  }
+}
+
 /**
  * 解析共享 / conversation 链接并返回消息列表
  * @param uuid conversation UUID

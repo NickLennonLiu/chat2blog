@@ -14,7 +14,6 @@ program
       if (err) throw err;
       console.log(`✔ 已写入 ${outFile}`);
     });
-    console.log(`✔ 已写入 ${outFile}`);
   });
 
 program

@@ -31,10 +31,10 @@ export function cleanMessages(list: Message[]): Message[] {
     const ct = (m.content as any).content_type;
     if (ct === "text") {
       const parts = (m.content as TextContent).parts ?? [];
-      if (parts.every((p) => p.trim() === "")) return false;
+      if (parts.every((p) => p.trim() === "" && m.author.role !== "tool")) return false;
     } else if (ct === "code") {
       const text = (m.content as CodeContent).text ?? "";
-      if (text.trim() === "") return false;
+      if (text.trim() === "" && m.author.role !== "tool") return false;
     } else if (ct === "thoughts") {
       const thoughts = (m.content as ThoughtsContent).thoughts ?? [];
       if (thoughts.every((t) => t.content.trim() === "")) return false;
@@ -135,42 +135,104 @@ function renderMsg(msg: Message): string {
 
   // 必要参数
   p.push(`role:${msg.author.role}`);
-  if (msg.id) p.push(`id:${q(msg.id)}`);
+  // if (msg.id) p.push(`id:${q(msg.id)}`);
 
   // 可选参数
   if (msg.author.name) p.push(`name:${q(msg.author.name)}`);
-  if (msg.create_time !== null) p.push(`ts:${msg.create_time}`);
+  if (msg.create_time !== null) {
+    // Format create time to ISO 8601
+    const time = new Date(msg.create_time * 1000).toISOString();
+    p.push(`time:${q(time)}`);
+  }
 
   const ct = (msg.content as any).content_type;
   if (ct && ct !== "text") p.push(`ct:${ct}`);
   if (ct === "code" && (msg.content as CodeContent).language)
     p.push(`lang:${(msg.content as CodeContent).language}`);
 
+  // Special case with Tool Use: the information are in metadata, not content
+  if (msg.author.role === "tool") {
+    p.push(`tool:${q(msg.author.name ?? "undefined" as string)}`);
+    
+  }
+
   const head = `{% chat ${p.join(" ")} %}`;
-  const body = renderContent(msg.content);
+  const body = msg.author.role === "tool" 
+    ? renderMetadata(msg)
+    : renderContent(msg.content);
   const tail = "{% endchat %}";
   return [head, body, tail].join("\n");
 }
 
+
+type Renderer<C extends { content_type: string }> = (c: C) => string;
+
+const renderText: Renderer<TextContent> = ({ parts }) => {
+  return parts.join("\n");
+}
+
+const renderCode: Renderer<CodeContent> = ({ language, text }) => {
+  return "```" + language + "\n" + text + "\n```";
+}
+
+const renderThoughts: Renderer<ThoughtsContent> = ({ thoughts }) => {
+  // each paragraph: <summary>:<content>
+  return thoughts.map(({ summary, content }) => {
+    return summary ? `${summary}: ${content}` : content;
+  }).join("\n\n");
+}
+
+const renderUnknown: Renderer<UnknownContent> = (c) => {
+  return JSON.stringify(c, null, 2);
+}
+
+const CONTENT_RENDERER: Record<string, Renderer<any>> = {
+  text: renderText,
+  code: renderCode,
+  thoughts: renderThoughts,
+  unknown: renderUnknown,
+}
+
+
 function renderContent(c: Message["content"]): string {
-  switch (c.content_type) {
-    case "text":
-      return (c as TextContent).parts.join("\n");
-    case "code": {
-      const { language = "", text } = c as CodeContent;
-      return "```" + language + "\n" + text + "\n```";
+  return (CONTENT_RENDERER[c.content_type] ?? renderUnknown)(c as any);
+}
+
+function renderMetadata(msg: Message) : string {
+  if (msg.author.role !== "tool") return "";
+
+  const groups = (msg.metadata as any)?.search_result_groups ?? [];
+  if (!Array.isArray(groups) || groups.length === 0) return "";
+
+  const lines: string[] = [];
+
+  for (const g of groups) {
+    // 分组标题（域名）
+    const domain = g.domain ?? "";
+    if (domain) lines.push(`**${domain}**`);
+
+    // 每条搜索结果
+    for (const e of g.entries ?? []) {
+      if (e.type !== "search_result") continue;
+
+      const url     = e.url as string;
+      const title   = (e.title as string)   || url;
+      const snippet = (e.snippet as string) || "";
+
+      // pub_date 以秒为单位的时间戳 → YYYY-MM-DD
+      let dateStr = "";
+      if (typeof e.pub_date === "number") {
+        dateStr = " (" + new Date(e.pub_date * 1000).toISOString().slice(0, 10) + ")";
+      }
+
+      lines.push(`- [${title}](${url})${dateStr}`);
+      if (snippet) lines.push(`  - ${snippet}`);
     }
-    default: {
-      // 其他类型直接 JSON 化包在代码块里
-      return (
-        "```" +
-        c.content_type +
-        "\n" +
-        JSON.stringify(c as UnknownContent, null, 2) +
-        "\n```"
-      );
-    }
+
+    lines.push("");           // 组之间空行
   }
+
+  return lines.join("\n");
 }
 
 /** 参数值含空格或冒号时，加双引号并转义 */

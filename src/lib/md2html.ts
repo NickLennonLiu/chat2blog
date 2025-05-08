@@ -1,38 +1,41 @@
-import matter from "gray-matter";
-import { Message, Content } from "./types.js";
-
-export function md2html(src: string): string {
-  return "Not Implemented";
+export interface ChatProps {
+  role?: 'user' | 'assistant' | 'system';
+  time?: string;          // ISO-8601
+  ct?: string;            // content-type: thoughts | code | …
+  lang?: string;          // language for ct:code
 }
-  // const blocks = src.split("\n---\n");
-  // const msgs: Message[] = blocks.map((b) => {
-  //   const { data } = matter(b, { delimiters: ["", ""] });
-  //   // 这里做类型收窄；若需要更严谨可先判断值是否合法
-  //   return {
-  //     role: data.role as "user" | "assistant",
-  //     content: String(data.content),
-  //     id: "",
-  //     author: { role: "system" },
-  //     create_time: null,
-  //     update_time: null,
-  //     status: "unknown",
-  //     end_turn: false,
-  //     weight: 0,
-  //     metadata: {},
-  //     recipient: null,
-  //     channel: null,
-  //   };
-  // });
 
-//   return `
-// <div class="cg-chat">
-//   ${msgs
-//     .map(
-//       (m) => `
-// <div class="cg-bubble ${m.role === "user" ? "cg-right" : "cg-left"}">
-//   <div class="cg-inner">${m.content}</div>
-// </div>`
-//     )
-//     .join("")}
-// </div>`;
-// }
+/**
+ * Turn `{% chat … %}` tag parameters into the opening `<div …>` that
+ * wraps one chat message.  
+ * Example call from the Hexo tag plugin:
+ *   md2htmltag(['role:user', 'time:"2025-05-04T14:13:45.366Z"', 'ct:thoughts'])
+ * ➜
+ *   <div class="chat chat-user chat-thoughts" data-time="2025-05-04T14:13:45.366Z">
+ */
+export function md2htmltag(rawArgs: string[]): string {
+  const props: Record<string, string> = {};
+
+  for (const arg of rawArgs) {
+    const idx = arg.indexOf(':');
+    if (idx === -1) continue;
+
+    const key = arg.slice(0, idx).trim();
+    let val = arg.slice(idx + 1).trim();
+
+    // remove optional surrounding quotes
+    if (val.startsWith('"') && val.endsWith('"')) {
+      val = val.slice(1, -1);
+    }
+    props[key] = val;
+  }
+
+  const role = props.role ?? 'user';
+  const ct   = props.ct   ?? '';
+  const cls  = ['chat', `chat-${role}`];
+  if (ct) cls.push(`chat-${ct}`);
+
+  const timeAttr = props.time ? ` data-time="${props.time}"` : '';
+
+  return `<div class="${cls.join(' ')}"${timeAttr}>`;
+}

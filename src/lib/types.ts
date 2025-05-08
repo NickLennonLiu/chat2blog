@@ -115,6 +115,8 @@ export interface ReasoningRecapContent extends BaseContent {
   content: string;               // 例如 “已思考 11 秒”
 }
 
+
+
 /** 未知 / 未来新增类型兜底 */
 export interface UnknownContent extends BaseContent {
   /** 任何未列举到的 content_type */
